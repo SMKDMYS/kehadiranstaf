@@ -1,0 +1,478 @@
+<html><head><base href="https://sites.google.com/d/1GokwrjATonFU9tEM1B9Nb4HAQtd8BSd2/p/1lA57Yj5T70HYrYPNqlaqJa2Lj691z471/edit">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Sistem Kehadiran Staf SMKDMYS v1.0</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 10px;
+        background-color: #f0f0f0;
+    }
+    .container {
+        max-width: 100%;
+        background-color: #fff;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        padding: 15px;
+    }
+    h1 {
+        font-size: 18px;
+        text-align: center;
+        margin-bottom: 5px;
+    }
+    .copyright {
+        font-size: 12pt;
+        text-align: center;
+        color: #666;
+        margin-bottom: 15px;
+    }
+    #datetime {
+        text-align: center;
+        font-size: 14px;
+        margin-bottom: 15px;
+    }
+    select, input[type="text"], input[type="date"] {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 16px;
+    }
+    .btn {
+        display: block;
+        width: 100%;
+        padding: 10px;
+        background-color: #007bff;
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        margin-bottom: 10px;
+        cursor: pointer;
+    }
+    .btn-danger {
+        background-color: #dc3545;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        font-size: 12px;
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    th {
+        background-color: #f2f2f2;
+    }
+    .red {
+        color: red;
+    }
+    #adminPanel {
+        display: none;
+        margin-top: 15px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+    }
+    #notCheckedInList {
+        margin-top: 15px;
+        padding: 10px;
+        background-color: #ffe6e6;
+        border-radius: 5px;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Sistem Kehadiran Staf SMKDMYS v1.0</h1>
+    <p class="copyright">Copyright© 2024. Aroky Chai. All Rights Reserved</p>
+    <div id="datetime"></div>
+
+    <button class="btn" onclick="toggleAdminPanel()">Admin</button>
+
+    <div id="adminPanel">
+        <button class="btn" onclick="addEmployee()">Add Employee</button>
+        <button class="btn" onclick="removeEmployee()">Remove Employee</button>
+        <button class="btn" onclick="modifyRecord()">Modify Record</button>
+        <button class="btn" onclick="deleteRecord()">Delete Record</button>
+        <button class="btn btn-danger" onclick="clearAllRecords()">Clear All Records</button>
+    </div>
+
+    <select id="employeeSelect">
+        <optgroup label="Morning Shift">
+            <option value="Azlan">Azlan</option>
+            <option value="Haliza">Haliza</option>
+            <option value="Nik">Nik</option>
+            <option value="Norazman">Norazman</option>
+        </optgroup>
+        <optgroup label="Afternoon Shift">
+            <option value="Chai">Chai</option>
+            <option value="Fizah">Fizah</option>
+            <option value="Mazliza">Mazliza</option>
+            <option value="Radiah">Radiah</option>
+        </optgroup>
+    </select>
+
+    <button class="btn" onclick="checkIn()">Check In</button>
+    <button class="btn" onclick="checkOut()">Check Out</button>
+
+    <select id="attendanceStatus">
+        <option value="present">Present</option>
+        <option value="absent">Absent</option>
+        <option value="late">Late</option>
+        <option value="early">Early Leave</option>
+    </select>
+
+    <input type="text" id="reasonInput" maxlength="100" placeholder="Reason (max 100 characters)">
+    <button class="btn" onclick="submitAttendance()">Submit</button>
+
+    <div id="notCheckedInList">
+        <h3>Not Checked In:</h3>
+        <ul id="notCheckedInEmployees"></ul>
+    </div>
+
+    <input type="date" id="reportDate">
+    <button class="btn" onclick="printReport()">Print Report</button>
+
+    <table id="attendanceTable">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Date</th>
+                <th>Check In</th>
+                <th>Check Out</th>
+                <th>Duration</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th>Reason</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<script>
+    let attendanceData = {};
+    const schoolLocation = {lat: 1.5190890410367053, lon: 103.51380295996773};
+
+    function updateDateTime() {
+        const now = new Date();
+        document.getElementById('datetime').textContent = now.toLocaleString();
+        updateNotCheckedInList();
+    }
+
+    setInterval(updateDateTime, 1000);
+
+    function updateNotCheckedInList() {
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+        const notCheckedInList = document.getElementById('notCheckedInEmployees');
+        notCheckedInList.innerHTML = '';
+
+        const allEmployees = [...document.querySelectorAll('#employeeSelect option')].map(option => option.value);
+        const checkedInEmployees = attendanceData[today] ? Object.keys(attendanceData[today]) : [];
+        const notCheckedInEmployees = allEmployees.filter(employee => !checkedInEmployees.includes(employee));
+
+        notCheckedInEmployees.forEach(employee => {
+            const li = document.createElement('li');
+            li.textContent = employee;
+            if ((now.getHours() >= 7 && now.getMinutes() >= 30 && isMorningShift(employee)) ||
+                (now.getHours() >= 12 && now.getMinutes() >= 30 && isAfternoonShift(employee))) {
+                li.classList.add('red');
+            }
+            notCheckedInList.appendChild(li);
+        });
+    }
+
+    function isMorningShift(employee) {
+        return ['Azlan', 'Haliza', 'Nik', 'Norazman'].includes(employee);
+    }
+
+    function isAfternoonShift(employee) {
+        return ['Chai', 'Fizah', 'Mazliza', 'Radiah'].includes(employee);
+    }
+
+    function checkIn() {
+        const employee = document.getElementById('employeeSelect').value;
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+        if (!attendanceData[today]) attendanceData[today] = {};
+        attendanceData[today][employee] = {
+            checkIn: now.toLocaleTimeString(),
+            location: checkLocation()
+        };
+        updateTable();
+        saveData();
+        updateNotCheckedInList();
+    }
+
+    function checkOut() {
+        const employee = document.getElementById('employeeSelect').value;
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+        if (attendanceData[today] && attendanceData[today][employee]) {
+            attendanceData[today][employee].checkOut = now.toLocaleTimeString();
+            const checkInTime = new Date(today + 'T' + attendanceData[today][employee].checkIn);
+            const duration = (now - checkInTime) / 1000 / 60 / 60; // in hours
+            attendanceData[today][employee].duration = duration.toFixed(2) + ' hours';
+            updateTable();
+            saveData();
+        } else {
+            alert("Employee hasn't checked in yet!");
+        }
+    }
+
+    function submitAttendance() {
+        const employee = document.getElementById('employeeSelect').value;
+        const status = document.getElementById('attendanceStatus').value;
+        const reason = document.getElementById('reasonInput').value;
+        const now = new Date();
+        const today = now.toISOString().split('T')[0];
+        
+        if (!attendanceData[today]) attendanceData[today] = {};
+        
+        if (status === 'absent') {
+            attendanceData[today][employee] = {
+                status: status,
+                reason: reason,
+                location: checkLocation()
+            };
+        } else if (status === 'late') {
+            attendanceData[today][employee] = {
+                checkIn: now.toLocaleTimeString(),
+                status: status,
+                reason: reason,
+                location: checkLocation()
+            };
+        } else if (status === 'early') {
+            if (!attendanceData[today][employee]) {
+                attendanceData[today][employee] = {};
+            }
+            attendanceData[today][employee].checkOut = now.toLocaleTimeString();
+            attendanceData[today][employee].status = status;
+            attendanceData[today][employee].reason = reason;
+            if (attendanceData[today][employee].checkIn) {
+                const checkInTime = new Date(today + 'T' + attendanceData[today][employee].checkIn);
+                const duration = (now - checkInTime) / 1000 / 60 / 60; // in hours
+                attendanceData[today][employee].duration = duration.toFixed(2) + ' hours';
+            }
+        }
+
+        updateTable();
+        saveData();
+        updateNotCheckedInList();
+    }
+
+    function checkLocation() {
+        // In a real app, you would use the Geolocation API here
+        // For this demo, we'll simulate a random location
+        const lat = schoolLocation.lat + (Math.random() - 0.5) * 0.01;
+        const lon = schoolLocation.lon + (Math.random() - 0.5) * 0.01;
+        
+        const distance = calculateDistance(lat, lon, schoolLocation.lat, schoolLocation.lon);
+        return distance <= 0.5 ? "SMKDMYS" : "Luar Kawasan";
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Radius of the earth in km
+        const dLat = deg2rad(lat2-lat1);
+        const dLon = deg2rad(lon2-lon1); 
+        const a = 
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2)
+        ; 
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+        const d = R * c; // Distance in km
+        return d;
+    }
+
+    function deg2rad(deg) {
+        return deg * (Math.PI/180)
+    }
+
+    function updateTable() {
+        const tbody = document.querySelector('#attendanceTable tbody');
+        tbody.innerHTML = '';
+        const today = new Date().toISOString().split('T')[0];
+        if (attendanceData[today]) {
+            for (const [employee, data] of Object.entries(attendanceData[today])) {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = employee;
+                row.insertCell().textContent = today;
+                row.insertCell().textContent = data.checkIn || '';
+                row.insertCell().textContent = data.checkOut || '';
+                row.insertCell().textContent = data.duration || '';
+                row.insertCell().textContent = data.location || '';
+                row.insertCell().textContent = data.status || 'Present';
+                row.insertCell().textContent = data.reason || '';
+            }
+        }
+    }
+
+    function saveData() {
+        localStorage.setItem('attendanceData', JSON.stringify(attendanceData));
+    }
+
+    function loadData() {
+        const savedData = localStorage.getItem('attendanceData');
+        if (savedData) {
+            attendanceData = JSON.parse(savedData);
+            updateTable();
+            updateNotCheckedInList();
+        }
+    }
+
+    function toggleAdminPanel() {
+        const password = prompt("Enter admin password:");
+        if (password === "6010") {
+            const adminPanel = document.getElementById('adminPanel');
+            adminPanel.style.display = adminPanel.style.display === 'none' ? 'block' : 'none';
+        } else {
+            alert("Incorrect password!");
+        }
+    }
+
+    function addEmployee() {
+        const name = prompt("Enter employee name:");
+        const shift = prompt("Enter shift (morning/afternoon):");
+        if (name && shift) {
+            const select = document.getElementById('employeeSelect');
+            const optgroup = select.querySelector(`optgroup[label="${shift.charAt(0).toUpperCase() + shift.slice(1)} Shift"]`);
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            optgroup.appendChild(option);
+            alert("Employee added successfully!");
+            updateNotCheckedInList();
+        }
+    }
+
+    function removeEmployee() {
+        const name = prompt("Enter employee name to remove:");
+        if (name) {
+            const option = document.querySelector(`option[value="${name}"]`);
+            if (option) {
+                option.remove();
+                alert("Employee removed successfully!");
+                updateNotCheckedInList();
+            } else {
+                alert("Employee not found!");
+            }
+        }
+    }
+
+    function modifyRecord() {
+        const date = prompt("Enter date (YYYY-MM-DD):");
+        const employee = prompt("Enter employee name:");
+        if (date && employee && attendanceData[date] && attendanceData[date][employee]) {
+            const field = prompt("Enter field to modify (checkIn, checkOut, status, reason):");
+            const value = prompt("Enter new value:");
+            if (field && value) {
+                attendanceData[date][employee][field] = value;
+                updateTable();
+                saveData();
+                alert("Record modified successfully!");
+            }
+        } else {
+            alert("Record not found!");
+        }
+    }
+
+    function deleteRecord() {
+        const date = prompt("Enter date (YYYY-MM-DD):");
+        const employee = prompt("Enter employee name:");
+        if (date && employee && attendanceData[date] && attendanceData[date][employee]) {
+            delete attendanceData[date][employee];
+            updateTable();
+            saveData();
+            alert("Record deleted successfully!");
+        } else {
+            alert("Record not found!");
+        }
+    }
+
+    function clearAllRecords() {
+        if (confirm("Are you sure you want to clear all records?")) {
+            attendanceData = {};
+            updateTable();
+            saveData();
+            alert("All records cleared!");
+        }
+    }
+
+    function printReport() {
+        const date = document.getElementById('reportDate').value;
+        if (date && attendanceData[date]) {
+            let printContent = '<table border="1"><tr><th>Name</th><th>Date</th><th>Check In</th><th>Check Out</th><th>Duration</th><th>Location</th><th>Status</th><th>Reason</th></tr>';
+            for (const [employee, data] of Object.entries(attendanceData[date])) {
+                printContent += `<tr><td>${employee}</td><td>${date}</td><td>${data.checkIn || ''}</td><td>${data.checkOut || ''}</td><td>${data.duration || ''}</td><td>${data.location || ''}</td><td>${data.status || 'Present'}</td><td>${data.reason || ''}</td></tr>`;
+            }
+            printContent += '</table>';
+            const printWindow = window.open('', '', 'height=600,width=800');
+            printWindow.document.write('<html><head><title>Attendance Report</title></head><body>');
+            printWindow.document.write(printContent);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.print();
+        } else {
+            alert("No data available for the selected date!");
+        }
+    }
+
+    // Auto-save at midnight
+    setInterval(() => {
+        const now = new Date();
+        if (now.getHours() === 0 && now.getMinutes() === 0 && now.getSeconds() === 0) {
+            saveData();
+        }
+    }, 1000);
+
+    // Auto-download at 18:45
+    setInterval(() => {
+        const now = new Date();
+        if (now.getHours() === 18 && now.getMinutes() === 45 && now.getSeconds() === 0) {
+            const today = now.toISOString().split('T')[0];
+            if (attendanceData[today]) {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(attendanceData[today]));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", today + "_attendance.json");
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            }
+        }
+    }, 1000);
+
+    // Auto-clear table at 6:00 AM
+    setInterval(() => {
+        const now = new Date();
+        if (now.getHours() === 6 && now.getMinutes() === 0 && now.getSeconds() === 0) {
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+            if (attendanceData[yesterdayStr]) {
+                delete attendanceData[yesterdayStr];
+                updateTable();
+                saveData();
+            }
+        }
+    }, 1000);
+
+    // Initial table update and not checked in list
+    loadData();
+    updateTable();
+    updateNotCheckedInList();
+
+    // Preserve records after page refresh
+    window.addEventListener('beforeunload', saveData);
+    window.addEventListener('load', loadData);
+</script>
+</body>
+</html>
